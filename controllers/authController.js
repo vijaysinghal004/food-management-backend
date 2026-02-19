@@ -1,6 +1,7 @@
-const  bcrypt  = require("bcryptjs");
+const bcrypt = require("bcryptjs");
 const User = require("../models/userModel");
 const { getToken } = require("../utils/token");
+const { sendOtpMail } = require("../utils/mail");
 
 exports.signUp = async (req, res) => {
     try {
@@ -65,10 +66,10 @@ exports.signUp = async (req, res) => {
 
 }
 
-exports.signIn=async(req,res)=>{
-      try {
+exports.signIn = async (req, res) => {
+    try {
         const { email, password } = req.body;
-        if ( !email || !password ) {
+        if (!email || !password) {
             return res.status(401).json({
                 success: false,
                 message: "All field are required"
@@ -81,8 +82,8 @@ exports.signIn=async(req,res)=>{
                 message: "email not found in db"
             })
         }
-        const hashpass=user.password;
-        const isMatch=await bcrypt.compare(password,hashpass);
+        const hashpass = user.password;
+        const isMatch = await bcrypt.compare(password, hashpass);
         if (!isMatch) {
             return res.status(401).json({
                 success: false,
@@ -112,17 +113,120 @@ exports.signIn=async(req,res)=>{
     }
 }
 
-exports.signOut=async(req,res)=>{
+exports.signOut = async (req, res) => {
+    try {
+        res.clearCookie("token");
+        res.status(200).json({
+            success: true,
+            message: "log out successfully"
+        })
+    } catch (err) {
+        res.status(501).json({
+            success: false,
+            message: "error in logout"
+        })
+    }
+}
+
+
+exports.sendOtp = async (req, res) => {
+    try {
+        const { email } = req.body;
+        let user = await User.findOne({ email });
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                message: "user does not exist"
+            })
+        }
+        let otp = Math.floor(1000 + Math.random() * 9000).toString();
+        user.resendOtp = otp;
+        user.OtpExpires = Date.now() + 5 * 60 * 1000;
+        User.isOtpVerified = false;
+        await user.save();
+        await sendOtpMail(email, otp);
+        return res.status(200).json({
+            success: true,
+            message: "otp send successfully"
+        })
+    } catch (err) {
+        return res.status(501).json({
+            success: false,
+            message: `send otp error ${err}`
+        })
+    }
+}
+
+exports.verifyOtp = async (req, res) => {
+    try {
+        const { email, otp } = req.body;
+        const user =await  User.findOne({ email });
+
+        if (!user || user.resendOtp != otp || user.OtpExpires < Date.now()) {
+            return res.status(400).json({
+                success: false,
+                message: "invalid or expire otp"
+            })
+        }
+        user.isOtpVerified = true,
+            user.resendOtp = undefined
+        user.OtpExpires = undefined
+        await user.save();
+        return res.status(200).json({
+            success: true,
+            message: "otp verify successfully"
+        })
+    } catch (err) {
+        return res.status(501).json({
+            success: false,
+            message: err.message
+        })
+    }
+
+}
+
+
+exports.resetPassword=async(req,res)=>{
     try{
-    res.clearCookie("token");
-    res.status(200).json({
-        success:true,
-        message:"log out successfully"
-    })
-    }catch(err){
-     res.status(501).json({
+     const {email,newPassword,confirmPassword}=req.body;
+     const user=await User.findOne({email});
+     if(!user){
+        return res.status(400).json({
+            success:false,
+            message:"user does not exist "
+        })
+     }
+
+     if(!user.isOtpVerified){
+        return res.status(400).json({
+            success:false,
+            message:"otp verification required"
+        })
+     }
+       if(!confirmPassword ||!newPassword){
+     return res.status(400).json({
         success:false,
-        message:"error in logout"
+        message:"both password field are required"
      })
+     }
+     if(newPassword!==confirmPassword){
+     return res.status(400).json({
+        success:false,
+        message:"both password are not match"
+     })
+     }
+     const hashPassword=await  bcrypt.hash(newPassword,10);
+      user.password=hashPassword;
+      user.isOtpVerified=false;
+      await user.save();
+      return res.status(200).json({
+        success:true,
+        message:"Password reset successfully"
+      })
+    }catch(err){
+  return res.status(500).json({
+        success:false,
+        message:err
+      })
     }
 }
