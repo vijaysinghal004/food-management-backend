@@ -9,7 +9,7 @@ exports.getCurrentUser=async(req,res)=>{
         message:"userId is not found"
     })
 }
-    const user=await User.findById(userId);
+ const user=await User.findById(userId);
    if(!user){
     return res.status(400).json({
         success:false,

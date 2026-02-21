@@ -88,6 +88,13 @@ exports.googleAuth = async (req, res) => {
             })
 
         }else{
+        const token = await getToken(user._id);
+        res.cookie("token", token, {
+            secure: false,
+            sameSite: "strict",
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+            httpOnly: true
+        });
             return res.status(201).json({
                 success:true,
                 message:"user exist ",
@@ -99,6 +106,38 @@ exports.googleAuth = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "ggogle auth in  signup " + err
+        })
+    }
+}
+
+exports.googleAuthlogin = async (req, res) => {
+    try {
+        const { fullName, email  } = req.body;
+        let user = await User.findOne({ email });
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                message: "Please signup first ",
+            })
+        }else{
+           const token = await getToken(user._id);
+        res.cookie("token", token, {
+            secure: false,
+            sameSite: "strict",
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+            httpOnly: true
+        });
+            return res.status(201).json({
+                success:true,
+                message:"user login by googleauth ",
+              user
+            })
+        }
+    } catch (err) {
+        console.log(err);
+        return res.status(500).json({
+            success: false,
+            message: "google auth in  signin " + err.message
         })
     }
 }
