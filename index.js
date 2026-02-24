@@ -6,6 +6,8 @@ require("dotenv").config();
 const authrouter=require("./routes/authRoute")
 const cors=require("cors");
 const userRoute = require("./routes/userRoute");
+const shopRoute = require("./routes/shopRoute");
+const itemRoute = require("./routes/itemRoute");
 
 connnectDB();
 app.use(cors({
@@ -16,6 +18,8 @@ app.use(express.json());
 app.use(cookieParser());
 app.use("/api/auth",authrouter);
 app.use("/api/user",userRoute);
+app.use("/api/shop",shopRoute)
+app.use("/api/item",itemRoute)
 app.get("/",(req,res)=>{
     res.send("hello from server");
 })
