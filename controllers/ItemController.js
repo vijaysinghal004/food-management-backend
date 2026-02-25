@@ -130,3 +130,38 @@ exports.deleteItem = async (req, res) => {
         })
     }
 }
+
+exports.getItemByCity = async (req, res) => {
+    try {
+        const { city } = req.params;
+        if(!city){
+            return res.status(404).json({
+                success:false,
+                message:"city is required"
+            })
+        }
+
+        const shops = await Shop.find({
+            city: { $regex: new RegExp(`^${city}$`, "i") }
+        })
+        if (!shops || shops.length == 0) {
+            return res.status(404).json({
+                success: false,
+                message: "No shopfound in your city"
+            })
+        }
+        const shopId=shops.map((shop)=>shop._id);
+
+        const items=await Item.find({shop:{$in:shopId}});
+        return res.status(200).json({
+            success: true,
+            message: `item found in ${city}`,
+            items
+        })
+    } catch (err) {
+        res.status(501).json({
+            success: false,
+            message: " get item by city error " + err
+        })
+    }
+}
