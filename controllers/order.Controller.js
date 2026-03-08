@@ -3,7 +3,13 @@ const Order = require("../models/OrderModel");
 const Shop = require("../models/shopModel");
 const User = require("../models/userModel");
 const { sendDeliveryOtpMail } = require("../utils/mail");
+const Razorpay = require('razorpay');
+require("dotenv").config();
 
+const instancs = new Razorpay({
+    key_id: process.env.RAZORPAY_ID_KEY,
+    key_secret: process.env.RAZORPAY_SECRET_KEY,
+});
 
 exports.placeOrder = async (req, res) => {
     try {
@@ -51,6 +57,30 @@ exports.placeOrder = async (req, res) => {
             }
         }))
 
+        if (paymentMethod == 'online') {
+            const razorOrder =await instancs.orders.create({
+                amount: Math.round(totalAmount * 100),
+                currency: "INR",
+                receipt: `receipt ${Date.now()}`
+
+            })
+            const newOrder = await Order.create({
+                user: req.userId,
+                paymentMethod,
+                deliveryAddress,
+                totalAmount,
+                shopOrders,
+                razorpayOrderId: razorOrder.id,
+                payment: false
+            })
+
+            return res.status(200).json({
+                razorOrder,
+                orderId: newOrder._id,
+            })
+
+        }
+
         const newOrder = await Order.create({
             user: req.userId,
             paymentMethod,
@@ -78,6 +108,46 @@ exports.placeOrder = async (req, res) => {
 // shopId1:[item1]
 // shopId2:[]
 // }
+
+
+
+exports.verifyPayment = async (req, res) => {
+    try {
+        const { razorpay_payment_id, orderId } = req.body;
+        const payment = await instancs.payments.fetch(razorpay_payment_id)
+        if (!payment || payment.status !== "captured") {
+            return res.status(400).json({
+                success: false,
+                message: "payment not captured"
+            })
+        }
+        const order=await Order.findById(orderId);
+        if(!order){
+             return res.status(400).json({
+                success: false,
+                message: "order not found"
+            })
+        }
+        order.payment=true
+        order.razorpayPaymentId=razorpay_payment_id
+        await order.save();
+        
+        await order.populate("shopOrders.shopOrderItems.item", "name image price")
+        await order.populate("shopOrders.shop", "name")
+return res.status(200).json({
+        success: true,
+            message: "order place successfully",
+            order
+})
+
+    } catch (err) {
+   return res.status(501).json({
+            success: false,
+            message: "verify Payment Order error " + err
+        })
+    }
+}
+
 
 exports.getMyOrders = async (req, res) => {
     try {
@@ -463,7 +533,7 @@ exports.sendDeliveryOtp = async (req, res) => {
 }
 exports.verifyDeliverydOtp = async (req, res) => {
     try {
-        const { orderId, shopOrderId,otp } = req.body;
+        const { orderId, shopOrderId, otp } = req.body;
         const order = await Order.findById(orderId).populate("user")
         const shopOrder = order.shopOrders.id(shopOrderId)
         if (!order || !shopOrder) {
@@ -478,21 +548,21 @@ exports.verifyDeliverydOtp = async (req, res) => {
                 message: "invalid/Expired Otp"
             })
         }
-    shopOrder.status="delivered"
-    shopOrder.deliveryAt=Date.now()
-    await order.save()
-    await DeliveryAssignment.deleteOne({
-        shopOrderId:shopOrder._id,
-        order:order._id,
-        assignedTo:shopOrder.assignedDeliveryBoy
-    })
+        shopOrder.status = "delivered"
+        shopOrder.deliveryAt = Date.now()
+        await order.save()
+        await DeliveryAssignment.deleteOne({
+            shopOrderId: shopOrder._id,
+            order: order._id,
+            assignedTo: shopOrder.assignedDeliveryBoy
+        })
 
-    return res.status(200).json({
-        success:true,
-        message:"order delivered successfully"
-    })
+        return res.status(200).json({
+            success: true,
+            message: "order delivered successfully"
+        })
     } catch (err) {
-  return res.status(501).json({
+        return res.status(501).json({
             success: false,
             message: "verifyDeliveryOtp error " + err.message
         })

@@ -25,15 +25,15 @@ const shopOrderSchema = new mongoose.Schema({
     },
     deliveryOtp: {
         type: String,
-        default:null
+        default: null
     },
-  
+
     OtpExpires: {
         type: Date
     },
-    deliveryAt:{
-        type:Date,
-        default:null
+    deliveryAt: {
+        type: Date,
+        default: null
     },
     subtotal: {
         type: Number
@@ -69,11 +69,18 @@ const orderSchema = new mongoose.Schema({
         type: Number
     },
     shopOrders: [shopOrderSchema],
-    // status:{
-    //     type:String,
-    //     enum:["pending","preparing","out of delivery","delivered"],
-    //     default:"pending"
-    // }
+    payment: {
+        type: Boolean,
+        default: false
+    },
+    razorpayOrderId: {
+        type: String,
+        default: ""
+    },
+    razorpayPaymentId: {
+        type: String,
+        default: ""
+    }
 }, { timestamps: true });
 
 const Order = mongoose.model("Order", orderSchema);
