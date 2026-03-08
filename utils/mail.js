@@ -19,3 +19,12 @@ exports.sendOtpMail=async(to,otp)=>{
         html:`<p>Your otp for password reset is <b>${otp}</b>.It is expires in 5 minutes. </p>`
     })
 }
+
+exports.sendDeliveryOtpMail=async(user,otp)=>{
+    await transporter.sendMail({
+        from:process.env.EMAIL,
+       to: user.email,
+        subject:"Delivery OTP",
+        html:`<p>Your otp for delivery is <b>${otp}</b>.It is expires in 5 minutes. </p>`
+    })
+}

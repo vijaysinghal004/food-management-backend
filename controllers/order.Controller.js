@@ -2,6 +2,7 @@ const DeliveryAssignment = require("../models/deliveryAssignment.model");
 const Order = require("../models/OrderModel");
 const Shop = require("../models/shopModel");
 const User = require("../models/userModel");
+const { sendDeliveryOtpMail } = require("../utils/mail");
 
 
 exports.placeOrder = async (req, res) => {
@@ -274,7 +275,7 @@ exports.acceptOrder = async (req, res) => {
         if (assignment.status !== "brodcasted") {
             return res.status(400).json({
                 success: false,
-                message: "assignment not expired"
+                message: "Assignment already accepted by another delivery boy"
             })
         }
         const alreadyAssigned = await DeliveryAssignment.findOne({
@@ -327,7 +328,7 @@ exports.getCurrentOrder = async (req, res) => {
             assignedTo: req.userId,
             status: "assigned"
         })
-        .populate("shop", "name")
+            .populate("shop", "name")
             .populate("assignedTo", "fullName email mobileno location")
             .populate({
                 path: "order",
@@ -337,12 +338,12 @@ exports.getCurrentOrder = async (req, res) => {
                         select: "fullName email location mobileno"
                     },
                     {
-  path:"shopOrders.shop",
-  select:"name"
+                        path: "shopOrders.shop",
+                        select: "name"
                     }
                 ]
             })
-            console.log(assignment)
+        console.log(assignment)
         if (!assignment) {
             return res.status(400).json({
                 success: false,
@@ -362,8 +363,8 @@ exports.getCurrentOrder = async (req, res) => {
                 message: "shopOrder not found"
             })
         }
-// await assignment.order.populate("shopOrders.shop", "name")  
-      let deliveryBoyLocation = { lat: null, lon: null }
+        // await assignment.order.populate("shopOrders.shop", "name")  
+        let deliveryBoyLocation = { lat: null, lon: null }
         if (assignment?.assignedTo?.location?.coordinates.length == 2) {
             deliveryBoyLocation.lat = assignment.assignedTo.location.coordinates[1]
             deliveryBoyLocation.lon = assignment.assignedTo.location.coordinates[0]
@@ -373,19 +374,127 @@ exports.getCurrentOrder = async (req, res) => {
             customerLocation.lat = assignment.order.deliveryAddress.latitude
             customerLocation.lon = assignment.order.deliveryAddress.longitude
         }
-return res.status(200).json({
-    _id:assignment.order._id,
-    user:assignment.order.user,
-    shopOrder,
-    deliveryAddress:assignment.order.deliveryAddress,
-    deliveryBoyLocation,
-    customerLocation
-})
+        return res.status(200).json({
+            _id: assignment.order._id,
+            user: assignment.order.user,
+            shopOrder,
+            deliveryAddress: assignment.order.deliveryAddress,
+            deliveryBoyLocation,
+            customerLocation
+        })
 
     } catch (err) {
         res.status(501).json({
             success: false,
             message: "getCurrentOrder error accure " + err
+        })
+    }
+}
+
+
+exports.getOrderById = async (req, res) => {
+    try {
+        const { orderId } = req.params
+        const order = await Order.findById(orderId).populate("user")
+            .populate({
+                path: "shopOrders.shop",
+                model: "Shop"
+            })
+            .populate({
+                path: "shopOrders.assignedDeliveryBoy",
+                model: "User"
+            })
+            .populate({
+                path: "shopOrders.shopOrderItems.item",
+                model: "Item"
+            })
+            .lean()
+
+        if (!order) {
+            res.status(400).json({
+                success: false,
+                message: "order not found"
+            })
+        }
+
+        return res.status(201).json({
+            success: true,
+            message: "order found by id ",
+            order
+        })
+
+    } catch (err) {
+        res.status(500).json({
+            success: false,
+            message: "getOrderById error occur" + err
+        })
+    }
+}
+
+
+exports.sendDeliveryOtp = async (req, res) => {
+    try {
+        const { orderId, shopOrderId } = req.body;
+        const order = await Order.findById(orderId).populate("user")
+        const shopOrder = order.shopOrders.id(shopOrderId)
+
+        if (!order || !shopOrder) {
+            res.status(401).json({
+                success: false,
+                message: "enter valid orderId/shopOrderId"
+            })
+        }
+        const otp = Math.floor(1000 + Math.random() * 9000).toString();
+        shopOrder.deliveryOtp = otp
+        shopOrder.OtpExpires = Date.now() + 5 * 60 * 1000
+        await order.save()
+        await sendDeliveryOtpMail(order.user, otp);
+        return res.status(201).json({
+            success: true,
+            message: `otp send successfully to ${order?.user.fullName} `
+        })
+
+    } catch (err) {
+        return res.status(501).json({
+            success: false,
+            message: "sendDeliveryOtp error " + err.message
+        })
+    }
+}
+exports.verifyDeliverydOtp = async (req, res) => {
+    try {
+        const { orderId, shopOrderId,otp } = req.body;
+        const order = await Order.findById(orderId).populate("user")
+        const shopOrder = order.shopOrders.id(shopOrderId)
+        if (!order || !shopOrder) {
+            res.status(401).json({
+                success: false,
+                message: "enter valid orderId/shopOrderId"
+            })
+        }
+        if (shopOrder.deliveryOtp !== otp || !shopOrder.OtpExpires || shopOrder.OtpExpires < Date.now()) {
+            return res.status(404).json({
+                success: false,
+                message: "invalid/Expired Otp"
+            })
+        }
+    shopOrder.status="delivered"
+    shopOrder.deliveryAt=Date.now()
+    await order.save()
+    await DeliveryAssignment.deleteOne({
+        shopOrderId:shopOrder._id,
+        order:order._id,
+        assignedTo:shopOrder.assignedDeliveryBoy
+    })
+
+    return res.status(200).json({
+        success:true,
+        message:"order delivered successfully"
+    })
+    } catch (err) {
+  return res.status(501).json({
+            success: false,
+            message: "verifyDeliveryOtp error " + err.message
         })
     }
 }

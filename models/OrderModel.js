@@ -23,6 +23,18 @@ const shopOrderSchema = new mongoose.Schema({
         enum: ["pending", "preparing", "out of delivery", "delivered"],
         default: "pending"
     },
+    deliveryOtp: {
+        type: String,
+        default:null
+    },
+  
+    OtpExpires: {
+        type: Date
+    },
+    deliveryAt:{
+        type:Date,
+        default:null
+    },
     subtotal: {
         type: Number
     },
@@ -32,9 +44,9 @@ const shopOrderSchema = new mongoose.Schema({
         ref: "DeliveryAssignment",
         default: null
     },
-    assignedDeliveryBoy:{
-        type:mongoose.Schema.Types.ObjectId,
-        ref:"User",
+    assignedDeliveryBoy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
     }
 }, { timestamps: true })
 
@@ -62,7 +74,6 @@ const orderSchema = new mongoose.Schema({
     //     enum:["pending","preparing","out of delivery","delivered"],
     //     default:"pending"
     // }
-
 }, { timestamps: true });
 
 const Order = mongoose.model("Order", orderSchema);
