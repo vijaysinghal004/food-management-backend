@@ -176,7 +176,8 @@ exports.getMyOrders = async (req, res) => {
                 user: order.user,
                 shopOrders: order.shopOrders.filter(o => o.owner == req.userId),
                 createdAt: order.createdAt,
-                deliveryAddress: order.deliveryAddress
+                deliveryAddress: order.deliveryAddress,
+                payment:order.payment
             }
             ))
             // console.log(filterOrder);
