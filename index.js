@@ -1,30 +1,51 @@
-const express=require("express");
+const express = require("express");
 const connnectDB = require("./config/db");
 const cookieParser = require("cookie-parser");
-const app=express();
 require("dotenv").config();
-const authrouter=require("./routes/authRoute")
-const cors=require("cors");
+const authrouter = require("./routes/authRoute")
+const cors = require("cors");
 const userRoute = require("./routes/userRoute");
 const shopRoute = require("./routes/shopRoute");
 const itemRoute = require("./routes/itemRoute");
 const orderRoute = require("./routes/orderRoute");
+const http = require("http");
+const { Server } = require("socket.io");
+const { socketHandler } = require("./socket");
+const app = express();
+
+
+// socket.io
+const server = http.createServer(app)
+
+const io=new Server(server,{
+    cors:{
+    origin: "http://localhost:5173",
+    credentials: true,
+    methods:['POST','GET']
+    }
+})
+  console.log("hello");
+app.set("io",io);
 
 connnectDB();
 app.use(cors({
-    origin:"http://localhost:5173",
-    credentials:true
+    origin: "http://localhost:5173",
+    credentials: true
 }))
 app.use(express.json());
 app.use(cookieParser());
-app.use("/api/auth",authrouter);
-app.use("/api/user",userRoute);
-app.use("/api/shop",shopRoute)
-app.use("/api/item",itemRoute)
-app.use("/api/order",orderRoute)
-app.get("/",(req,res)=>{
+app.use("/api/auth", authrouter);
+app.use("/api/user", userRoute);
+app.use("/api/shop", shopRoute)
+app.use("/api/item", itemRoute)
+app.use("/api/order", orderRoute)
+app.get("/", (req, res) => {
     res.send("hello from server");
 })
-app.listen(process.env.PORT,()=>{
+socketHandler(io);
+server.listen(process.env.PORT, () => {
     console.log("server is running at port no 8080");
 })
+// app.listen(process.env.PORT, () => {
+//     console.log("server is running at port no 8080");
+// })

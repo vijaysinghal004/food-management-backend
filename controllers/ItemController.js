@@ -51,7 +51,10 @@ exports.editItem = async (req, res) => {
         }
         const item = await Item.findByIdAndUpdate(itemId,
             { name, category, foodType, price, image },
-            { new: true })
+            { new: true }
+            //   { returnDocument: "after" }
+            
+        )
         if (!item) {
             return res.status(404).json({
                 success: false,

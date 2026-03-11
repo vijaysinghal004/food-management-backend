@@ -43,7 +43,11 @@ exports.createEditShop = async (req, res) => {
     }else{
          shop = await Shop.findByIdAndUpdate(shop._id,{
             name, city, state, address, image, owner: req.userId
-        },{new:true})
+        },
+        {new:true}
+        //   { returnDocument: "after" }
+
+    )
     }
         await shop.populate("owner")
         await shop.populate({

@@ -58,7 +58,7 @@ exports.placeOrder = async (req, res) => {
         }))
 
         if (paymentMethod == 'online') {
-            const razorOrder =await instancs.orders.create({
+            const razorOrder = await instancs.orders.create({
                 amount: Math.round(totalAmount * 100),
                 currency: "INR",
                 receipt: `receipt ${Date.now()}`
@@ -91,7 +91,28 @@ exports.placeOrder = async (req, res) => {
 
         await newOrder.populate("shopOrders.shopOrderItems.item", "name image price")
         await newOrder.populate("shopOrders.shop", "name")
+        await newOrder.populate("shopOrders.owner", "name socketId")
+        await newOrder.populate("user")
 
+
+        const io = req.app.get("io")
+
+        if (io) {
+            newOrder.shopOrders.forEach(shopOrder => {
+                const ownerSocketId = shopOrder.owner.socketId
+                if (ownerSocketId) {
+                    io.to(ownerSocketId).emit('newOrder', {
+                        _id: newOrder._id,
+                        paymentMethod: newOrder.paymentMethod,
+                        user: newOrder.user,
+                        shopOrders: [shopOrder],
+                        createdAt: newOrder.createdAt,
+                        deliveryAddress: newOrder.deliveryAddress,
+                        payment: newOrder.payment
+                    })
+                }
+            })
+        }
         return res.status(201).json({
             success: true,
             message: "order place successfully",
@@ -121,32 +142,57 @@ exports.verifyPayment = async (req, res) => {
                 message: "payment not captured"
             })
         }
-        const order=await Order.findById(orderId);
-        if(!order){
-             return res.status(400).json({
+        const order = await Order.findById(orderId);
+        if (!order) {
+            return res.status(400).json({
                 success: false,
                 message: "order not found"
             })
         }
-        order.payment=true
-        order.razorpayPaymentId=razorpay_payment_id
+        order.payment = true
+        order.razorpayPaymentId = razorpay_payment_id
         await order.save();
-        
+
         await order.populate("shopOrders.shopOrderItems.item", "name image price")
         await order.populate("shopOrders.shop", "name")
-return res.status(200).json({
-        success: true,
+        await order.populate("shopOrders.owner", "name socketId")
+        await order.populate("user")
+
+        const io = req.app.get("io")
+
+        if (io) {
+            console.log(order);
+            order.shopOrders.forEach(shopOrder => {
+                const ownerSocketId = shopOrder.owner.socketId
+                if (ownerSocketId) {
+                    io.to(ownerSocketId).emit('newOrder', {
+                        _id: order._id,
+                        paymentMethod: order.paymentMethod,
+                        user: order.user,
+                        shopOrders: [shopOrder],
+                        createdAt: order.createdAt,
+                        deliveryAddress: order.deliveryAddress,
+                        payment: order.payment
+                    })
+                }
+            })
+        }
+
+
+        return res.status(200).json({
+            success: true,
             message: "order place successfully",
             order
-})
+        })
 
     } catch (err) {
-   return res.status(501).json({
+        return res.status(501).json({
             success: false,
             message: "verify Payment Order error " + err
         })
     }
 }
+
 
 
 exports.getMyOrders = async (req, res) => {
@@ -157,6 +203,7 @@ exports.getMyOrders = async (req, res) => {
                 .populate("shopOrders.shop", "name")
                 .populate("shopOrders.owner", "name email mobile")
                 .populate("shopOrders.shopOrderItems.item", "name image price")
+                .populate("user", "name email mobileno")
             return res.status(201).json({
                 success: true,
                 message: "order get by user successfully",
@@ -177,7 +224,7 @@ exports.getMyOrders = async (req, res) => {
                 shopOrders: order.shopOrders.filter(o => o.owner == req.userId),
                 createdAt: order.createdAt,
                 deliveryAddress: order.deliveryAddress,
-                payment:order.payment
+                payment: order.payment
             }
             ))
             // console.log(filterOrder);
@@ -203,7 +250,7 @@ exports.updateOrdersStatus = async (req, res) => {
         const { orderId, shopId } = req.params;
         const { status } = req.body;
         const order = await Order.findById(orderId);
-        const shopOrder = order.shopOrders.find(o => o.shop == shopId);
+        const shopOrder = order.shopOrders.find(o => String(o.shop) == String(shopId));
         if (!shopOrder) {
             return res.status(400).json({
                 success: false,
@@ -222,7 +269,7 @@ exports.updateOrdersStatus = async (req, res) => {
                             type: "Point",
                             coordinates: [Number(longitude), Number(latitude)],
                         },
-                        $maxDistance: 5000
+                        $maxDistance: 10000
 
                     }
                 }
@@ -258,6 +305,9 @@ exports.updateOrdersStatus = async (req, res) => {
 
             })
 
+            await deliveryAssignment.populate("shop")
+            await deliveryAssignment.populate("order")
+
 
             shopOrder.assignment = deliveryAssignment._id
             shopOrder.assignedDeliveryBoy = deliveryAssignment.assignedTo
@@ -270,19 +320,54 @@ exports.updateOrdersStatus = async (req, res) => {
             }))
 
 
+            // const io = req.app.get('io');
+            // if (io) {
+            //     availableBoys.forEach(boy => {
+            //         const boySocketId = boy.socketId
+            //         if (boySocketId) {
+            //             io.to(boySocketId).emit("newAssignment", {
+            //                 sendTo:boy._id,
+            //                 assignmentId: deliveryAssignment._id,
+            //                 orderId: deliveryAssignment.order._id,
+            //                 shopName: deliveryAssignment.shop.name,
+            //                 deliveryAddress: deliveryAssignment.order.deliveryAddress,
+            //                 // items:a.order.shopOrders.find(so=>so._id==a.shopOrderId).shopOrderItems || [],
+            //                 // subTotal:a.order.shopOrders.find(so=>so._id==a.shopOrderId)?.subtotal || [],
+            //                 items: deliveryAssignment.order.shopOrders.find(so => so._id.equals(deliveryAssignment.shopOrderId)).shopOrderItems || [],
+            //                 subTotal: deliveryAssignment.order.shopOrders.find(so => so._id.equals(deliveryAssignment.shopOrderId))?.subtotal || [],
+            //             })
+            //         }
+            //     })
+            // }
+
+
         }
 
 
         // await shopOrder.save();
         await order.save();
-        const updatedShopOrder = order.shopOrders.find(o => o.shop == shopId)
         await order.populate("shopOrders.shop", "name ")
         await order.populate("shopOrders.assignedDeliveryBoy", "fullName email mobileno")
+        const updatedShopOrder = order.shopOrders.find(o => String(o.shop._id || o.shop) == String(shopId))
+        await order.populate("user", "socketId")
 
+
+        const io = req.app.get('io')
+        if (io) {
+            const userSocketId = order.user.socketId;
+            if (userSocketId) {
+                io.to(userSocketId).emit("update-status", {
+                    orderId: order._id,
+                    shopId: updatedShopOrder.shop._id,
+                    status: updatedShopOrder.status,
+                    userId: order.user._id
+                })
+            }
+        }
 
         res.status(200).json({
             success: true,
-            message: "order place successfully",
+            message: "order status update successfully",
             shopOrderStatus: status,
             shopOrder: updatedShopOrder,
             assignedDeliveryBoy: updatedShopOrder?.assignedDeliveryBoy,
