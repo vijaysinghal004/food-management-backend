@@ -320,36 +320,36 @@ exports.updateOrdersStatus = async (req, res) => {
             }))
 
 
-            // const io = req.app.get('io');
-            // if (io) {
-            //     availableBoys.forEach(boy => {
-            //         const boySocketId = boy.socketId
-            //         if (boySocketId) {
-            //             io.to(boySocketId).emit("newAssignment", {
-            //                 sendTo:boy._id,
-            //                 assignmentId: deliveryAssignment._id,
-            //                 orderId: deliveryAssignment.order._id,
-            //                 shopName: deliveryAssignment.shop.name,
-            //                 deliveryAddress: deliveryAssignment.order.deliveryAddress,
-            //                 // items:a.order.shopOrders.find(so=>so._id==a.shopOrderId).shopOrderItems || [],
-            //                 // subTotal:a.order.shopOrders.find(so=>so._id==a.shopOrderId)?.subtotal || [],
-            //                 items: deliveryAssignment.order.shopOrders.find(so => so._id.equals(deliveryAssignment.shopOrderId)).shopOrderItems || [],
-            //                 subTotal: deliveryAssignment.order.shopOrders.find(so => so._id.equals(deliveryAssignment.shopOrderId))?.subtotal || [],
-            //             })
-            //         }
-            //     })
-            // }
+            const io = req.app.get('io');
+            if (io) {
+                availableBoys.forEach(boy => {
+                    const boySocketId = boy.socketId
+                    if (boySocketId) {
+                        io.to(boySocketId).emit("newAssignment", {
+                            sendTo:boy._id,
+                            d:{
+                            assignmentId: deliveryAssignment._id,
+                            orderId: deliveryAssignment.order._id,
+                            shopName: deliveryAssignment.shop.name,
+                            deliveryAddress: deliveryAssignment.order.deliveryAddress,
+                            items: deliveryAssignment.order.shopOrders.find(so => so._id.equals(deliveryAssignment.shopOrderId)).shopOrderItems || [],
+                            subTotal: deliveryAssignment.order.shopOrders.find(so => so._id.equals(deliveryAssignment.shopOrderId))?.subtotal || [],
+                            }
+                        })
+                    }
+                })
+            }
 
 
         }
 
 
-        // await shopOrder.save();
+        await shopOrder.save();
         await order.save();
         await order.populate("shopOrders.shop", "name ")
         await order.populate("shopOrders.assignedDeliveryBoy", "fullName email mobileno")
         const updatedShopOrder = order.shopOrders.find(o => String(o.shop._id || o.shop) == String(shopId))
-        await order.populate("user", "socketId")
+        await order.populate("user")
 
 
         const io = req.app.get('io')
@@ -372,7 +372,7 @@ exports.updateOrdersStatus = async (req, res) => {
             shopOrder: updatedShopOrder,
             assignedDeliveryBoy: updatedShopOrder?.assignedDeliveryBoy,
             availableBoys: deliveryBoyPayload,
-            assignment: updatedShopOrder?.assignment._id
+            assignment: updatedShopOrder?.assignment?._id
         })
     } catch (err) {
         res.status(501).json({
