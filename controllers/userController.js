@@ -61,3 +61,4 @@ exports.updateUserLocation = async (req, res) => {
         });
     }
 }
+
