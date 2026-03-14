@@ -654,3 +654,55 @@ exports.verifyDeliverydOtp = async (req, res) => {
         })
     }
 }
+
+
+exports.getTodayDeliveries=async(req,res)=>{
+    try{
+  const deliveryBoyId=req.userId
+  const startOfDay=new Date()
+  startOfDay.setHours(0,0,0,0)
+  const orders=await Order.find({
+    "shopOrders.assignedDeliveryBoy":deliveryBoyId,
+    "shopOrders.status":"delivered",
+    "shopOrders.deliveryAt":{$gte:startOfDay}
+  }).lean()
+
+  let todaysDeliveries=[]
+  orders.forEach(order=>{
+    order.shopOrders.forEach(shopOrder=>{
+        if(shopOrder.assignedDeliveryBoy.toString()===deliveryBoyId.toString() &&
+            shopOrder.status=='delivered' &&
+            shopOrder.deliveryAt &&
+            shopOrder.deliveryAt>=startOfDay
+        ){
+        todaysDeliveries.push(shopOrder)
+        }
+    })
+  })
+
+  let stats={}
+  todaysDeliveries.forEach(shopOrder=>{
+    const hour=new Date(shopOrder.deliveryAt).getHours()
+    stats[hour]=(stats[hour]||0)+1
+  })
+
+  let formattedStats=Object.keys(stats).map(hour=>({
+    hour:parseInt(hour),
+    count:stats[hour]
+  }))
+
+//   [
+//     {
+//         hour:10,
+//         count:12
+//     }
+//   ]
+formattedStats.sort((a,b)=>a.hour-b.hour)
+return res.status(200).json(formattedStats)
+    }catch(err){
+return res.status(501).json({
+    success:false,
+    message:"getTodayDeliveries error "+err.message
+})
+    }
+}
