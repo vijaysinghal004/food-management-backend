@@ -19,7 +19,8 @@ const server = http.createServer(app)
 
 const io=new Server(server,{
     cors:{
-    origin: "http://localhost:5173",
+    // origin: "http://localhost:5173",
+    origin: "https://food-management-frontend-0h96.onrender.com",
     credentials: true,
     methods:['POST','GET']
     }
@@ -29,7 +30,7 @@ app.set("io",io);
 
 connnectDB();
 app.use(cors({
-    origin: "http://localhost:5173",
+    origin: "https://food-management-frontend-0h96.onrender.com",
     credentials: true
 }))
 app.use(express.json());
