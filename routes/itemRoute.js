@@ -10,6 +10,7 @@ itemRoute.post("/add-item",isAuth,upload.single("image") ,addItem);
 itemRoute.post("/edit-item/:itemId",isAuth,upload.single("image") ,editItem);
 itemRoute.get("/get-item-by-id/:itemId",isAuth,getItemById);
 itemRoute.get("/get-item-by-city/:city",isAuth,getItemByCity);
+itemRoute.get("/search-items",isAuth,searchItems);
 itemRoute.get("/get-item-by-shop/:shopId",isAuth,getItemByShop);
 itemRoute.get("/delete/:itemId",isAuth,deleteItem);
 itemRoute.post("/rating",isAuth,rating);

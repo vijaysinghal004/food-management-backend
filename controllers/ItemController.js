@@ -222,7 +222,7 @@ exports.searchItems = async (req, res) => {
         }).populate("shop", "name image")
 
         return res.status(200).json({
-            suceees:true,
+            success:true,
             items
         });
 
